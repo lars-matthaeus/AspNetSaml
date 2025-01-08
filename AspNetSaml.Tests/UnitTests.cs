@@ -2,6 +2,8 @@ using Saml;
 using System.IO.Compression;
 using System.IO;
 using System.Text;
+using Shouldly;
+using System.Security.Claims;
 
 namespace AspNetSaml.Tests
 {
@@ -171,6 +173,75 @@ MIICajCCAdOgAwIBAgIBADANBgkqhkiG9w0BAQ0FADBSMQswCQYDVQQGEwJ1czETMBEGA1UECAwKQ2Fs
 			var x = StringToByteArray(cert);
 			var y = Encoding.ASCII.GetBytes(cert);
 			Assert.IsTrue(x.SequenceEqual(y));
+		}
+
+		[TestMethod]
+		public void TestEncryptedAssertions()
+		{
+			// SAML values from https://www.samltool.com/generic_sso_res.php.
+
+			var cert = Constants.Certificates.Certificate;
+
+			var samlresp = new Saml.Response(cert);
+
+			var xml = @$"<?xml version=""1.0""?>
+                        <samlp:Response xmlns:samlp=""urn:oasis:names:tc:SAML:2.0:protocol"" xmlns:saml=""urn:oasis:names:tc:SAML:2.0:assertion"" ID=""_8e8dc5f69a98cc4c1ff3427e5ce34606fd672f91e6"" Version=""2.0"" IssueInstant=""2014-07-17T01:01:48Z"" Destination=""http://sp.example.com/demo1/index.php?acs"" InResponseTo=""ONELOGIN_4fee3b046395c4e751011e97f8900b5273d56685"">
+                            <saml:Issuer>http://idp.example.com/metadata.php</saml:Issuer>
+                            <samlp:Status>
+                                <samlp:StatusCode Value=""urn:oasis:names:tc:SAML:2.0:status:Success""/>
+                            </samlp:Status>
+                            <saml:EncryptedAssertion>
+                                <xenc:EncryptedData xmlns:xenc=""http://www.w3.org/2001/04/xmlenc#"" xmlns:dsig=""http://www.w3.org/2000/09/xmldsig#"" Type=""http://www.w3.org/2001/04/xmlenc#Element"">
+	                                <xenc:EncryptionMethod Algorithm=""http://www.w3.org/2001/04/xmlenc#aes128-cbc""/>
+	                                <dsig:KeyInfo xmlns:dsig=""http://www.w3.org/2000/09/xmldsig#"">
+		                                <xenc:EncryptedKey>
+			                                <xenc:EncryptionMethod Algorithm=""http://www.w3.org/2001/04/xmlenc#rsa-1_5""/>
+			                                <xenc:CipherData>
+				                                <xenc:CipherValue>Pn5IVvMXk8cdvEJHQ0VGq9WMOaV2dg4QbuCdEt8Pc1yWZLUMlOghPK0pMevLsuKyBcUz/cIoQihsroBrQONrtLzhdqndGCtaZYoOdO2Lz0T5Huesqd6iEKihrtsLf4RGj2VX3XbtdQV5R/3IdnjGCgj4zClxtJb4P7gCApeQ/uIpjIuo/f1rwn9F0A+gbL5HOSicOrLMjTJVBwPR2EtwY1g7fomkKQtJpWiq2+LsXLoSwWIYM4wHyem6U+zX9qTr2yRefiNuyz1Ye0QCN1LXQCIYFrS0Mhao4MqXNXzkktmI1/FcAbGAwReUkAGY2UuS6+9MtPDuRFOk+8h+ldrxJBU=</xenc:CipherValue>
+			                                </xenc:CipherData>
+		                                </xenc:EncryptedKey>
+	                                </dsig:KeyInfo>
+	                                <xenc:CipherData>
+		                                <xenc:CipherValue>WDObtBFd84WFugFF97T0SM3jd0QE6UPhVaiaLJsWRE9/rWN2oF7d0TfiYN9RmbcWYVMVdxl26o2QMX7nKv+ufesu+GSEMApKOKKjYqGYIWvSsnoeqZGoXftjl7+axLAt7XAqT4edh4IhaxM4k3aPdEFfc+fZVNzr9djUcOF7l7tFT29M0zeO/K/y6m9lvaWiRvdLf1K1Wqw8eramYvE7FhomwbIeWJguHznKrAfxhqw6HifIot/ox1pKpmyP49HLvq5tWQexTS+iNyktXzv0wZDOKjtfOy5xd5L8iXVBhY29a0tiFcnVrEWKZ7Z/kTKrl6uuxtiD6qOmlLQpcoSc1DeXnooBJn/PhIbsQZo6uKTtzMmRc62R3d32JZRUrg/Bpjtcb6nB4Iz4SSw4gSm4w7aNGKX3DqYpTAseEg082wtY4ZX8wTcb0pRV5Gc/h7vRNGtqD1q8/gmhQdpRZ468lg==</xenc:CipherValue>
+	                                </xenc:CipherData>
+                                </xenc:EncryptedData>
+                            </saml:EncryptedAssertion>
+                            <saml:EncryptedAssertion>
+                                <xenc:EncryptedData xmlns:xenc=""http://www.w3.org/2001/04/xmlenc#"" xmlns:dsig=""http://www.w3.org/2000/09/xmldsig#"" Type=""http://www.w3.org/2001/04/xmlenc#Element"">
+	                                <xenc:EncryptionMethod Algorithm=""http://www.w3.org/2001/04/xmlenc#aes128-cbc""/>
+	                                <dsig:KeyInfo xmlns:dsig=""http://www.w3.org/2000/09/xmldsig#"">
+		                                <xenc:EncryptedKey>
+			                                <xenc:EncryptionMethod Algorithm=""http://www.w3.org/2001/04/xmlenc#rsa-1_5""/>
+			                                <xenc:CipherData>
+				                                <xenc:CipherValue>Pn5IVvMXk8cdvEJHQ0VGq9WMOaV2dg4QbuCdEt8Pc1yWZLUMlOghPK0pMevLsuKyBcUz/cIoQihsroBrQONrtLzhdqndGCtaZYoOdO2Lz0T5Huesqd6iEKihrtsLf4RGj2VX3XbtdQV5R/3IdnjGCgj4zClxtJb4P7gCApeQ/uIpjIuo/f1rwn9F0A+gbL5HOSicOrLMjTJVBwPR2EtwY1g7fomkKQtJpWiq2+LsXLoSwWIYM4wHyem6U+zX9qTr2yRefiNuyz1Ye0QCN1LXQCIYFrS0Mhao4MqXNXzkktmI1/FcAbGAwReUkAGY2UuS6+9MtPDuRFOk+8h+ldrxJBU=</xenc:CipherValue>
+			                                </xenc:CipherData>
+		                                </xenc:EncryptedKey>
+	                                </dsig:KeyInfo>
+	                                <xenc:CipherData>
+		                                <xenc:CipherValue>WDObtBFd84WFugFF97T0SM3jd0QE6UPhVaiaLJsWRE9/rWN2oF7d0TfiYN9RmbcWYVMVdxl26o2QMX7nKv+ufesu+GSEMApKOKKjYqGYIWvSsnoeqZGoXftjl7+axLAt7XAqT4edh4IhaxM4k3aPdEFfc+fZVNzr9djUcOF7l7tFT29M0zeO/K/y6m9lvaWiRvdLf1K1Wqw8eramYvE7FhomwbIeWJguHznKrAfxhqw6HifIot/ox1pKpmyP49HLvq5tWQexTS+iNyktXzv0wZDOKjtfOy5xd5L8iXVBhY29a0tiFcnVrEWKZ7Z/kTKrl6uuxtiD6qOmlLQpcoSc1DeXnooBJn/PhIbsQZo6uKTtzMmRc62R3d32JZRUrg/Bpjtcb6nB4Iz4SSw4gSm4w7aNGKX3DqYpTAseEg082wtY4ZX8wTcb0pRV5Gc/h7vRNGtqD1q8/gmhQdpRZ468lg==</xenc:CipherValue>
+	                                </xenc:CipherData>
+                                </xenc:EncryptedData>
+                            </saml:EncryptedAssertion>
+                        </samlp:Response>";
+
+			samlresp.LoadXml(xml);
+
+			var attributes = samlresp.GetEncryptedAttributes();
+
+			attributes.ShouldNotBeEmpty();
+
+			var expectedValues = new[] {
+				(ClaimTypes.MobilePhone, "555-555-1234"),
+				(ClaimTypes.MobilePhone, "555-555-4321"),
+				(ClaimTypes.MobilePhone, "555-555-1234"),
+				(ClaimTypes.MobilePhone, "555-555-4321")
+				};
+
+			attributes.ShouldBe(expectedValues);
+
+			// The results can be filtered by claim type.
+			attributes.Where(x => x.Name == ClaimTypes.MobilePhone).ShouldBe(expectedValues);
+			attributes.Where(x => x.Name == ClaimTypes.Email).ShouldBeEmpty();
 		}
 
 		private static byte[] StringToByteArray(string st)
