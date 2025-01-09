@@ -4,6 +4,8 @@ using System.IO;
 using System.Text;
 using Shouldly;
 using System.Security.Claims;
+using System.Runtime.ConstrainedExecution;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace AspNetSaml.Tests
 {
@@ -176,13 +178,23 @@ MIICajCCAdOgAwIBAgIBADANBgkqhkiG9w0BAQ0FADBSMQswCQYDVQQGEwJ1czETMBEGA1UECAwKQ2Fs
 		}
 
 		[TestMethod]
-		public void TestEncryptedAssertions()
+		[DataRow(true)]
+		[DataRow(false)]
+		public void TestEncryptedAssertions(bool certificateContructor)
 		{
 			// SAML values from https://www.samltool.com/generic_sso_res.php.
 
-			var cert = Constants.Certificates.Certificate;
+			Saml.Response samlresp;
+			if (certificateContructor)
+			{
+				var cert = Constants.Certificates.Certificate;
+				samlresp = new Saml.Response(cert);
+			}
+			else
+			{
+				samlresp = new Saml.Response(Constants.Certificates.PublicCertificate, Constants.Certificates.PrivateKey, null);
+			}
 
-			var samlresp = new Saml.Response(cert);
 
 			var xml = @$"<?xml version=""1.0""?>
                         <samlp:Response xmlns:samlp=""urn:oasis:names:tc:SAML:2.0:protocol"" xmlns:saml=""urn:oasis:names:tc:SAML:2.0:assertion"" ID=""_8e8dc5f69a98cc4c1ff3427e5ce34606fd672f91e6"" Version=""2.0"" IssueInstant=""2014-07-17T01:01:48Z"" Destination=""http://sp.example.com/demo1/index.php?acs"" InResponseTo=""ONELOGIN_4fee3b046395c4e751011e97f8900b5273d56685"">
