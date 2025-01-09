@@ -17,6 +17,9 @@ using System.Runtime;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Xml.Linq;
+using Org.BouncyCastle.OpenSsl;
+using Org.BouncyCastle.Security;
+using Org.BouncyCastle.Crypto.Parameters;
 
 namespace Saml
 {
@@ -67,6 +70,22 @@ namespace Saml
 			}
 
 			return samlCertificate;
+		}
+
+		//like EnsureCertFormat, but for private key
+		protected static string EnsurePrivateKeyFormat(string keyStr)
+		{
+			var keyStrCorrected = keyStr.Replace("\r", "").Replace("\n\n", "\n");
+			if (!keyStrCorrected.StartsWith("-----BEGIN PRIVATE KEY-----"))
+			{
+				keyStrCorrected = "-----BEGIN PRIVATE KEY-----\n" + keyStrCorrected.Trim();
+			}
+			if (!keyStrCorrected.EndsWith("-----END PRIVATE KEY-----"))
+			{
+				keyStrCorrected = keyStrCorrected.Trim() + "\n-----END PRIVATE KEY-----";
+			}
+
+			return keyStrCorrected;
 		}
 
 		public void LoadXmlFromBase64(string response)
@@ -154,11 +173,21 @@ namespace Saml
 
 	public class Response : BaseResponse
 	{
+		protected readonly RSA _privateKey = null;
+
 		public Response(string certificateStr, string responseString = null) : base(certificateStr, responseString) { }
+
+		public Response(string certificateStr, string privateKeyStr, string responseString) : base(certificateStr, responseString) {
+			PemReader pemReader = new PemReader(new StringReader(EnsurePrivateKeyFormat(privateKeyStr)));
+			var key = pemReader.ReadObject();
+			_privateKey = DotNetUtilities.ToRSA((RsaPrivateCrtKeyParameters)key);
+		}
 
 		public Response(byte[] certificateBytes, string responseString = null) : base(certificateBytes, responseString) { }
 
-		public Response(X509Certificate2 certificate, string responseString = null) : base(certificate, responseString) { }
+		public Response(X509Certificate2 certificate, string responseString = null) : base(certificate, responseString) { 
+			_privateKey = _certificate.GetRSAPrivateKey(); // returns null in case no private key is present - exactly what we need
+		}
 
 		/// <summary>
 		/// returns the User's login
@@ -253,7 +282,7 @@ namespace Saml
 		/// </remarks>
 		public IEnumerable<(string Name, string Value)> GetEncryptedAttributes()
 		{
-			if (_certificate?.HasPrivateKey != true)
+			if (_privateKey == null)
 			{
 				yield break;
 			}
@@ -276,7 +305,7 @@ namespace Saml
 				using var key = Rijndael.Create(encryptionAlgorithm);
 				key.Key = EncryptedXml.DecryptKey(
 												Convert.FromBase64String(encryptionKeyCipherValue),
-												_certificate.GetRSAPrivateKey(),
+												_privateKey,
 												useOAEP: encryptionKeyAlgorithm == EncryptedXml.XmlEncRSAOAEPUrl
 											);
 
