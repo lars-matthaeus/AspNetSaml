@@ -20,6 +20,7 @@ using System.Xml.Linq;
 using Org.BouncyCastle.OpenSsl;
 using Org.BouncyCastle.Security;
 using Org.BouncyCastle.Crypto.Parameters;
+using System.Reflection.Emit;
 
 namespace Saml
 {
@@ -330,6 +331,65 @@ namespace Saml
 				{
 					yield return (Name: attributeType, Value: value.Value);
 				}
+			}
+		}
+
+		/// <summary>
+		/// Decrypts the EncryptedAssertion using the SAML Service Provider's certificate private key
+		/// and adds them as unencrypted Assertions to the xml document. Afterwards, all functionality for
+		/// unencrypted Assertions can be used, e.g. IsValid, GetCustomAttribute etc
+		/// </summary>
+		/// <remarks>
+		/// Adapted from: https://github.com/ruialexrib/Programatica.Auth.SAML.ServiceProviderUtils/blob/master/src/Utils/AssertionParserUtils.cs.
+		/// </remarks>
+		public void AddDecryptedAssertions()
+		{
+			if (_privateKey == null)
+			{
+				return;
+			}
+
+			var dataElements = _xmlDoc.SelectNodes("/samlp:Response/saml:EncryptedAssertion/xenc:EncryptedData", _xmlNameSpaceManager);
+
+			if (dataElements == null || dataElements.Count == 0)
+			{
+				return;
+			}
+
+			var parserContext = new XmlParserContext(null, _xmlNameSpaceManager, null, XmlSpace.None);
+
+			foreach (XmlNode element in dataElements)
+			{
+				var encryptionAlgorithm = element.SelectSingleNode("//xenc:EncryptionMethod", _xmlNameSpaceManager).Attributes["Algorithm"]?.Value;
+				var encryptionKeyAlgorithm = element.SelectSingleNode("//ds:KeyInfo/xenc:EncryptedKey/xenc:EncryptionMethod", _xmlNameSpaceManager)?.Attributes["Algorithm"]?.Value;
+				var encryptionKeyCipherValue = element.SelectSingleNode("//ds:KeyInfo/xenc:EncryptedKey/xenc:CipherData/xenc:CipherValue", _xmlNameSpaceManager)?.InnerText;
+
+				using var key = Rijndael.Create(encryptionAlgorithm);
+				key.Key = EncryptedXml.DecryptKey(
+												Convert.FromBase64String(encryptionKeyCipherValue),
+												_privateKey,
+												useOAEP: encryptionKeyAlgorithm == EncryptedXml.XmlEncRSAOAEPUrl
+											);
+
+				var encryptedXml = new EncryptedXml();
+				var encryptedData = new EncryptedData();
+				encryptedData.LoadXml((XmlElement)element);
+
+				using var reader = new XmlTextReader(
+					Encoding.UTF8.GetString(
+						encryptedXml.DecryptData(encryptedData, key)
+					),
+					XmlNodeType.Element,
+					parserContext);
+
+				var attributeElement = XElement.Load(reader);
+				var attributeDoc = new XmlDocument();
+				attributeDoc.Load(attributeElement.CreateReader());
+
+				XmlNode importNode = _xmlDoc.ImportNode(attributeDoc.FirstChild, true);
+
+				XmlNode baseNode = _xmlDoc.FirstChild;
+				baseNode.AppendChild(importNode);
 			}
 		}
 	}
